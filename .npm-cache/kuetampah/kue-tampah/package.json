@@ -1,0 +1,19 @@
+{
+  "name": "kue-tampah",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter frontend dev",
+    "build": "pnpm --filter frontend build",
+    "start": "pnpm --filter frontend start",
+    "verify": "node verifySetup.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.2",
+    "eslint-config-next": "^14.2.13",
+    "eslint-config-prettier": "^9.1.0"
+  },
+  "packageManager": "pnpm@10.18.1+sha512.77a884a165cbba2d8d1c19e3b4880eee6d2fcabd0d879121e282196b80042351d5eb3ca0935fa599da1dc51265cc68816ad2bddd2a2de5ea9fdf92adbec7cd34"
+}

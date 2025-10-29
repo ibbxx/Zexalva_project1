@@ -1,0 +1,93 @@
+﻿/* Tailwind @theme editor warning is silenced via .vscode/settings.json */
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --brand-surface: #ffffff;
+  --brand-panel: #f5f6f9;
+  --brand-white: #ffffff;
+  --brand-black: #0b1020;
+  --brand-muted: #5f6774;
+  --brand-pink-50: #fdf1f6;
+  --brand-pink-200: #f3cada;
+  --brand-pink-500: #d7618d;
+  --brand-green-50: #eef7f3;
+  --brand-green-200: #cce8db;
+  --brand-green-600: #2ba47b;
+  --brand-green-800: #1f7865;
+  --brand-cream-50: var(--brand-panel);
+  --brand-cream-100: #f9f0f5;
+  --brand-cream-200: #f1e6ec;
+  --brand-brown-300: var(--brand-pink-200);
+  --brand-brown-500: var(--brand-pink-500);
+  --brand-brown-700: #b34b74;
+  --brand-brown-900: var(--brand-black);
+  --brand-gold-400: #3ca986;
+  --focus-ring: 0 0 0 4px color-mix(in srgb, var(--brand-green-600) 35%, transparent);
+  --radius-lg: 1.5rem;
+  --radius-md: 1rem;
+  --radius-sm: 0.75rem;
+}
+
+@theme inline {
+  --color-background: var(--brand-white);
+  --color-foreground: var(--brand-black);
+  --color-muted: var(--brand-muted);
+  --color-primary: var(--brand-pink-500);
+  --color-primary-50: var(--brand-pink-50);
+  --color-primary-200: var(--brand-pink-200);
+  --color-secondary: var(--brand-green-600);
+  --color-secondary-50: var(--brand-green-50);
+  --color-secondary-200: var(--brand-green-200);
+  --color-secondary-800: var(--brand-green-800);
+  --color-card: var(--brand-white);
+  --color-surface: var(--brand-surface);
+  --border-radius-lg: var(--radius-lg);
+  --border-radius-md: var(--radius-md);
+  --border-radius-sm: var(--radius-sm);
+  --font-sans: var(--font-brand), ui-sans-serif, system-ui, "Segoe UI", Roboto, Arial, "Noto Sans", sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--brand-surface);
+  color: var(--brand-black);
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display), serif;
+  letter-spacing: -0.01em;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.shadow-card {
+  box-shadow:
+    0 18px 36px rgba(13, 16, 32, 0.05),
+    0 10px 24px rgba(13, 16, 32, 0.04);
+}

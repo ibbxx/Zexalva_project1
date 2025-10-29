@@ -1,0 +1,21 @@
+{
+  "name": "Kue Tampah",
+  "short_name": "KueTampah",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f7f8",
+  "theme_color": "#ec407a",
+  "description": "Informasi pemesanan Kue Tampah tradisional dengan checkout via WhatsApp & QRIS.",
+  "icons": [
+    {
+      "src": "/file.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    },
+    {
+      "src": "/favicon.ico",
+      "type": "image/x-icon",
+      "sizes": "48x48"
+    }
+  ]
+}

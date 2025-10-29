@@ -1,0 +1,146 @@
+[
+  {
+    "id": "1",
+    "name": "S15 - REDFACE",
+    "handle": "S15 - REDFACE",
+    "description": "Material product 275 Gsm 16S Aus Plastisol ink w puff Woven Rubber patch",
+    "price": 265000,
+    "category": "T-Shirts",
+    "images": [
+      "https://down-id.img.susercontent.com/file/id-11134207-7rbke-matcsac7a8qgb0@resize_w900_nl.webp",
+      "https://down-id.img.susercontent.com/file/id-11134207-7rbk7-matcsa31nndqec@resize_w900_nl.webp"
+    ],
+    "sizes": ["S", "M", "L", "XL"],
+    "colors": ["Black", "White", "Charcoal"],
+    "featured": true,
+    "stock": 50
+  },
+  {
+    "id": "2",
+    "name": "S15 - STAND RED",
+    "handle": "S15 - STAND RED",
+    "description": "Design bold dengan artwork original yang merepresentasikan kultur urban. Material cotton combed premium dengan sablon berkualitas tinggi.",
+    "price": 333000,
+    "category": "T-Shirts",
+    "images": [
+      "https://down-id.img.susercontent.com/file/id-11134207-7rbk7-mat6s3e2opea98@resize_w900_nl.webp",
+      "https://down-id.img.susercontent.com/file/id-11134207-7rbk7-mat6s3e2opwec2@resize_w900_nl.webp"
+    ],
+    "sizes": ["S", "M", "L", "XL"],
+    "colors": ["Black", "Dark Red", "Navy"],
+    "featured": true,
+    "stock": 35
+  },
+  {
+    "id": "3",
+    "name": "Midnight Essential Hoodie",
+    "handle": "midnight-essential-hoodie",
+    "description": "Hoodie premium dengan bahan fleece tebal dan lembut. Detail embroidery eksklusif dengan desain minimalis namun berkarakter kuat.",
+    "price": 485000,
+    "category": "Hoodies",
+    "images": [
+      "https://images.pexels.com/photos/7648047/pexels-photo-7648047.jpeg?auto=compress&cs=tinysrgb&w=800",
+      "https://images.pexels.com/photos/7648048/pexels-photo-7648048.jpeg?auto=compress&cs=tinysrgb&w=800"
+    ],
+    "sizes": ["M", "L", "XL", "XXL"],
+    "colors": ["Black", "Charcoal", "Olive"],
+    "featured": true,
+    "stock": 28
+  },
+  {
+    "id": "4",
+    "name": "Shadow Strike Hoodie",
+    "handle": "shadow-strike-hoodie",
+    "description": "Hoodie oversized dengan grafis striking di bagian belakang. Material premium fleece dengan kantong depan yang luas dan hood adjustable.",
+    "price": 525000,
+    "category": "Hoodies",
+    "images": [
+      "https://images.pexels.com/photos/8148577/pexels-photo-8148577.jpeg?auto=compress&cs=tinysrgb&w=800",
+      "https://images.pexels.com/photos/8148578/pexels-photo-8148578.jpeg?auto=compress&cs=tinysrgb&w=800"
+    ],
+    "sizes": ["M", "L", "XL"],
+    "colors": ["Black", "Dark Grey", "Military Green"],
+    "featured": true,
+    "stock": 22
+  },
+  {
+    "id": "5",
+    "name": "Anarchy Logo Tee",
+    "handle": "anarchy-logo-tee",
+    "description": "Essential tee dengan logo ZEXALVA yang iconic. Cut modern dan material premium untuk daily wear yang stylish.",
+    "price": 245000,
+    "category": "T-Shirts",
+    "images": [
+      "https://images.pexels.com/photos/8605073/pexels-photo-8605073.jpeg?auto=compress&cs=tinysrgb&w=800",
+      "https://images.pexels.com/photos/8605074/pexels-photo-8605074.jpeg?auto=compress&cs=tinysrgb&w=800"
+    ],
+    "sizes": ["S", "M", "L", "XL", "XXL"],
+    "colors": ["Black", "White", "Ash Grey"],
+    "featured": false,
+    "stock": 60
+  },
+  {
+    "id": "6",
+    "name": "Dystopia Graphic Tee",
+    "handle": "dystopia-graphic-tee",
+    "description": "Limited edition tee dengan artwork dystopian theme. Printing detail tinggi dengan material cotton premium.",
+    "price": 295000,
+    "category": "T-Shirts",
+    "images": [
+      "https://images.pexels.com/photos/9558599/pexels-photo-9558599.jpeg?auto=compress&cs=tinysrgb&w=800",
+      "https://images.pexels.com/photos/9558600/pexels-photo-9558600.jpeg?auto=compress&cs=tinysrgb&w=800"
+    ],
+    "sizes": ["S", "M", "L", "XL"],
+    "colors": ["Black", "Charcoal"],
+    "featured": true,
+    "stock": 18
+  },
+  {
+    "id": "7",
+    "name": "Revolt Zip Hoodie",
+    "handle": "revolt-zip-hoodie",
+    "description": "Zip hoodie dengan desain asimetris dan detail hardware premium. Material fleece berkualitas dengan full zip untuk versatilitas styling.",
+    "price": 545000,
+    "category": "Hoodies",
+    "images": [
+      "https://images.pexels.com/photos/8532046/pexels-photo-8532046.jpeg?auto=compress&cs=tinysrgb&w=800",
+      "https://images.pexels.com/photos/8532047/pexels-photo-8532047.jpeg?auto=compress&cs=tinysrgb&w=800"
+    ],
+    "sizes": ["M", "L", "XL"],
+    "colors": ["Black", "Grey", "Navy"],
+    "featured": false,
+    "stock": 15
+  },
+  {
+    "id": "8",
+    "name": "Chaos Emblem Tee",
+    "handle": "chaos-emblem-tee",
+    "description": "Statement tee dengan emblem chaos yang bold. Design eksklusif yang merepresentasikan identitas brand dengan kuat.",
+    "price": 275000,
+    "category": "T-Shirts",
+    "images": [
+      "https://images.pexels.com/photos/8148492/pexels-photo-8148492.jpeg?auto=compress&cs=tinysrgb&w=800",
+      "https://images.pexels.com/photos/8148493/pexels-photo-8148493.jpeg?auto=compress&cs=tinysrgb&w=800"
+    ],
+    "sizes": ["S", "M", "L", "XL", "XXL"],
+    "colors": ["Black", "White", "Burgundy"],
+    "featured": false,
+    "stock": 42
+  },
+  {
+    "id": "9",
+    "name": "Void Pullover Hoodie",
+    "handle": "void-pullover-hoodie",
+    "description": "Classic pullover hoodie dengan twist modern. Bahan fleece premium dengan graphic placement yang strategis.",
+    "price": 465000,
+    "category": "Hoodies",
+    "images": [
+      "https://images.pexels.com/photos/8148581/pexels-photo-8148581.jpeg?auto=compress&cs=tinysrgb&w=800",
+      "https://images.pexels.com/photos/8148582/pexels-photo-8148582.jpeg?auto=compress&cs=tinysrgb&w=800"
+    ],
+    "sizes": ["M", "L", "XL", "XXL"],
+    "colors": ["Black", "Charcoal", "Dark Blue"],
+    "featured": true,
+    "stock": 30
+  }
+]
