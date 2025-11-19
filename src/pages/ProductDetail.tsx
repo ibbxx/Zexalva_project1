@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Minus, Plus, ShoppingCart, ArrowLeft } from 'lucide-react';
-import { getAllProducts, getProductByHandle } from '@/lib/getProducts';
 import { useCart } from '@/context/CartContext';
+import { useProducts } from '@/hooks/useProducts';
+import { useProductBySlug } from '@/hooks/useProductBySlug';
 
 // 🔧 editable: ubah locale formatter untuk detail harga produk
 const currency = new Intl.NumberFormat('id-ID');
@@ -46,28 +47,75 @@ const kelas = {
   bingkaiRekomendasi: 'bg-white p-6',
   gambarRekomendasi: 'w-full object-contain',
   namaRekomendasi: 'text-xs uppercase tracking-[0.35em] text-black/60 group-hover:text-black',
+  pesanKosong: 'py-6 text-center text-sm uppercase tracking-[0.3em] text-black/40',
 };
 
-const products = getAllProducts();
-
 export default function ProductDetail() {
-  const { handle } = useParams<{ handle: string }>();
+  const params = useParams<{ slug: string }>();
+  const slugParam = params.slug ?? '';
+  const isSlugReady = Boolean(params.slug);
   const navigate = useNavigate();
-  const product = getProductByHandle(handle ?? '');
   const { addToCart } = useCart();
+  const {
+    data: product,
+    loading,
+    error,
+  } = useProductBySlug(slugParam, { enabled: isSlugReady });
+  const categorySlug = product?.category?.slug;
+  const { data: relatedProductsRaw, loading: relatedLoading } = useProducts({
+    categorySlug: categorySlug ?? undefined,
+    enabled: Boolean(categorySlug),
+  });
 
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [quantity, setQuantity] = useState(1);
 
-  if (!product) {
+  const sizeOptions = useMemo(() => {
+    if (!product) return [];
+    const sizes = new Set<string>();
+    product.variants.forEach((variant) => {
+      if (variant.size) sizes.add(variant.size);
+    });
+    return Array.from(sizes);
+  }, [product]);
+
+  const colorOptions = useMemo(() => {
+    if (!product) return [];
+    const colors = new Set<string>();
+    product.variants.forEach((variant) => {
+      if (variant.color) colors.add(variant.color);
+    });
+    return Array.from(colors);
+  }, [product]);
+
+  const relatedProducts = useMemo(() => {
+    if (!product) return [];
+    return relatedProductsRaw.filter((item) => item.id !== product.id).slice(0, 4);
+  }, [product, relatedProductsRaw]);
+
+  const totalStock = useMemo(
+    () =>
+      product?.variants.reduce((sum, variant) => sum + (variant.stock ?? 0), 0) ?? 0,
+    [product]
+  );
+
+  if (loading) {
     return (
       <div className={kelas.halamanTidakDitemukan}>
         <div className={kelas.wadahTidakDitemukan}>
-          {/* // 🔧 editable: ubah pesan ketika produk tidak ditemukan */}
-          <h2 className={kelas.judulTidakDitemukan}>Product not found</h2>
-          {/* // 🔧 editable: ganti teks tombol kembali ke toko */}
+          <h2 className={kelas.judulTidakDitemukan}>Loading product...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <div className={kelas.halamanTidakDitemukan}>
+        <div className={kelas.wadahTidakDitemukan}>
+          <h2 className={kelas.judulTidakDitemukan}>{error ?? 'Product not found'}</h2>
           <button
             onClick={() => navigate('/shop')}
             className={kelas.tombolKembaliToko}
@@ -80,17 +128,16 @@ export default function ProductDetail() {
   }
 
   const handleAddToCart = () => {
-    if (!selectedSize || !selectedColor) {
-      alert('Please select size and color');
-      // 🔧 editable: sesuaikan pesan validasi sebelum menambahkan ke keranjang
+    if (!selectedSize) {
+      alert('Please select a size');
+      return;
+    }
+    if (colorOptions.length > 0 && !selectedColor) {
+      alert('Please select a color');
       return;
     }
     addToCart(product, selectedSize, selectedColor, quantity);
   };
-
-  const relatedProducts = products
-    .filter((p) => p.category === product.category && p.id !== product.id)
-    .slice(0, 4);
 
   return (
     <div className={kelas.halaman}>
@@ -107,7 +154,7 @@ export default function ProductDetail() {
           <div className={kelas.kolomGambar}>
             <div className={kelas.bingkaiGambar}>
               <img
-                src={product.images[selectedImage]}
+                src={product.images[selectedImage]?.url ?? product.images[0]?.url ?? ''}
                 alt={product.name}
                 className={kelas.gambarUtama}
               />
@@ -116,13 +163,13 @@ export default function ProductDetail() {
               <div className={kelas.kisiThumbnail}>
                 {product.images.map((img, idx) => (
                   <button
-                    key={img}
+                    key={img.id}
                     onClick={() => setSelectedImage(idx)}
                     className={`${kelas.tombolThumbnail} ${
                       selectedImage === idx ? kelas.tombolThumbnailAktif : ''
                     }`}
                   >
-                    <img src={img} alt={`${product.name} ${idx + 1}`} className={kelas.gambarThumbnail} />
+                    <img src={img.url} alt={`${product.name} ${idx + 1}`} className={kelas.gambarThumbnail} />
                   </button>
                 ))}
               </div>
@@ -132,7 +179,7 @@ export default function ProductDetail() {
           <div className={kelas.kolomInformasi}>
             <div className={kelas.headerProduk}>
               {/* // 🔧 editable: ubah gaya penampilan kategori jika diperlukan */}
-              <p className={kelas.kategori}>{product.category}</p>
+              <p className={kelas.kategori}>{product.category?.name ?? 'Uncategorized'}</p>
               {/* // 🔧 editable: atur format judul produk */}
               <h1 className={kelas.judulProduk}>{product.name}</h1>
               {/* // 🔧 editable: sesuaikan format harga produk */}
@@ -148,13 +195,11 @@ export default function ProductDetail() {
               {/* // 🔧 editable: ubah label pilihan ukuran */}
               <p className={kelas.labelPilihan}>Size</p>
               <div className={kelas.pilihanBaris}>
-                {product.sizes.map((size) => (
+                {sizeOptions.map((size) => (
                   <button
                     key={size}
                     onClick={() => setSelectedSize(size)}
-                    className={`${kelas.tombolPilihan} ${
-                      selectedSize === size ? kelas.tombolPilihanAktif : ''
-                    }`}
+                    className={`${kelas.tombolPilihan} ${selectedSize === size ? kelas.tombolPilihanAktif : ''}`}
                   >
                     {size}
                   </button>
@@ -162,23 +207,24 @@ export default function ProductDetail() {
               </div>
             </div>
 
-            <div className={kelas.blokPilihan}>
-              {/* // 🔧 editable: ganti label pilihan warna */}
-              <p className={kelas.labelPilihan}>Color</p>
-              <div className={kelas.pilihanBaris}>
-                {product.colors.map((color) => (
-                  <button
-                    key={color}
-                    onClick={() => setSelectedColor(color)}
-                    className={`${kelas.tombolPilihan} ${
-                      selectedColor === color ? kelas.tombolPilihanAktif : ''
-                    }`}
-                  >
-                    {color}
-                  </button>
-                ))}
+            {colorOptions.length > 0 && (
+              <div className={kelas.blokPilihan}>
+                <p className={kelas.labelPilihan}>Color</p>
+                <div className={kelas.pilihanBaris}>
+                  {colorOptions.map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => setSelectedColor(color)}
+                      className={`${kelas.tombolPilihan} ${
+                        selectedColor === color ? kelas.tombolPilihanAktif : ''
+                      }`}
+                    >
+                      {color}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className={kelas.blokPilihan}>
               {/* // 🔧 editable: sesuaikan label jumlah beli */}
@@ -205,7 +251,7 @@ export default function ProductDetail() {
             <div className={kelas.informasiTambahan}>
               <div className={kelas.barisInformasi}>
                 <span>Stock</span>
-                <span>{product.stock} units</span>
+                <span>{totalStock} units</span>
                 {/* // 🔧 editable: atur label dan format stok */}
               </div>
               <div className={kelas.barisInformasi}>
@@ -222,20 +268,23 @@ export default function ProductDetail() {
           </div>
         </section>
 
-        {relatedProducts.length > 0 && (
-          <section className={kelas.rekomendasi}>
-            {/* // 🔧 editable: ubah judul rekomendasi produk */}
-            <h2 className={kelas.judulRekomendasi}>Kamu mungkin suka</h2>
+        <section className={kelas.rekomendasi}>
+          <h2 className={kelas.judulRekomendasi}>Kamu mungkin suka</h2>
+          {relatedLoading ? (
+            <div className={kelas.pesanKosong}>Loading related products...</div>
+          ) : relatedProducts.length === 0 ? (
+            <p className="text-sm text-black/40">Belum ada produk terkait.</p>
+          ) : (
             <div className={kelas.kisiRekomendasi}>
               {relatedProducts.map((related) => (
                 <button
                   key={related.id}
-                  onClick={() => navigate(`/product/${related.handle}`)}
+                  onClick={() => navigate(`/product/${related.slug}`)}
                   className={kelas.kartuRekomendasi}
                 >
                   <div className={kelas.bingkaiRekomendasi}>
                     <img
-                      src={related.images[0]}
+                      src={related.images[0]?.url ?? ''}
                       alt={related.name}
                       className={kelas.gambarRekomendasi}
                     />
@@ -244,8 +293,8 @@ export default function ProductDetail() {
                 </button>
               ))}
             </div>
-          </section>
-        )}
+          )}
+        </section>
       </div>
     </div>
   );
