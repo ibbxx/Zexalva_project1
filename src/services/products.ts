@@ -93,8 +93,7 @@ const mapProduct = (record: ProductRecord): Product => {
   const category = resolveCategory(record.category ?? null);
 
   const totalStock =
-    record.product_variants?.reduce((sum, variant) => sum + (variant.stock ?? 0), 0) ??
-    0;
+    record.product_variants?.reduce((sum, variant) => sum + Number(variant.stock ?? 0), 0) ?? 0;
 
   return {
     id: String(record.id),
@@ -110,10 +109,10 @@ const mapProduct = (record: ProductRecord): Product => {
     variants:
       record.product_variants?.map((variant, index) => ({
         id: variant.id ? String(variant.id) : `variant-${record.id}-${index}`,
-        size: variant.size ?? null,
-        color: variant.color ?? null,
+        size: variant.size ?? '',
+        color: variant.color ?? '',
         price: null,
-        stock: variant.stock ?? null,
+        stock: Number(variant.stock ?? 0),
       })) ?? [],
     stock: totalStock,
     featured: Boolean(record.featured),
@@ -209,6 +208,34 @@ export async function getFeaturedProducts(): ServiceResponse<Product[]> {
 }
 
 /* =====================================================================
+   GET PRODUCT VARIANTS (ADMIN)
+===================================================================== */
+export async function getProductVariants(
+  productId: string
+): ServiceResponse<ProductVariantRow[]> {
+  const { data, error } = await supabase
+    .from('product_variants')
+    .select('id, size, color, stock')
+    .eq('product_id', productId)
+    .order('size', { ascending: true })
+    .order('color', { ascending: true });
+
+  if (error) {
+    return { data: [], error };
+  }
+
+  const variants =
+    data?.map((variant) => ({
+      id: String(variant.id),
+      size: variant.size ?? '',
+      color: variant.color ?? '',
+      stock: Number(variant.stock ?? 0),
+    })) ?? [];
+
+  return { data: variants, error: null };
+}
+
+/* =====================================================================
    CREATE PRODUCT
 ===================================================================== */
 export interface ProductWritePayload {
@@ -223,24 +250,40 @@ export interface ProductWritePayload {
 }
 
 export interface ProductVariantInput {
-  size: string | null;
-  color?: string | null;
-  stock: number | null;
+  size: string;
+  color: string;
+  stock: number;
+  hasStockInput?: boolean;
+}
+
+export interface ProductVariantRow extends ProductVariantInput {
+  id: string;
 }
 
 const normalizeCategoryId = (value: string | number | null | undefined) =>
   value === '' || value === undefined ? null : value;
 
-const normalizeVariants = (variants: ProductVariantInput[], productId: string) =>
-  variants
-    .filter((v) => Boolean(v.size))
-    .map((v, index) => ({
-      product_id: productId,
-      size: v.size,
-      color: v.color ?? null,
-      stock: v.stock,
-      position: index,
-    }));
+const normalizeVariants = (variants: ProductVariantInput[] | undefined, productId: string) =>
+  (variants ?? [])
+    .map((v) => {
+      const size = (v.size ?? '').trim();
+      const color = (v.color ?? '').trim();
+      const rawStock = Number.isFinite(v.stock) ? Number(v.stock) : 0;
+      const stock = Math.max(0, Math.trunc(rawStock));
+      const hasStockInput = v.hasStockInput ?? Number.isFinite(v.stock);
+      if (!size && !color && !hasStockInput) {
+        return null;
+      }
+      return {
+        product_id: productId,
+        size,
+        color,
+        stock,
+      };
+    })
+    .filter((variant): variant is { product_id: string; size: string; color: string; stock: number } =>
+      Boolean(variant)
+    );
 
 const normalizeImages = (images: string[], productId: string) =>
   images
@@ -254,7 +297,7 @@ const normalizeImages = (images: string[], productId: string) =>
 export async function createProduct(
   payload: ProductWritePayload,
   images: string[],
-  variants: ProductVariantInput[]
+  variants: ProductVariantInput[] = []
 ): ServiceResponse<Product | null> {
   const basePayload = {
     name: payload.name,
@@ -312,7 +355,7 @@ export async function updateProduct(
   id: string,
   payload: ProductWritePayload,
   images: string[],
-  variants: ProductVariantInput[]
+  variants: ProductVariantInput[] = []
 ): ServiceResponse<Product | null> {
   const basePayload = {
     name: payload.name,
@@ -341,7 +384,8 @@ export async function updateProduct(
   await supabase.from('product_variants').delete().eq('product_id', id);
   const variantPayload = normalizeVariants(variants, id);
   if (variantPayload.length) {
-    await supabase.from('product_variants').insert(variantPayload);
+    const { error: variantError } = await supabase.from('product_variants').insert(variantPayload);
+    if (variantError) return { data: null, error: variantError };
   }
 
   const { data: productRecord, error: fetchError } = await supabase

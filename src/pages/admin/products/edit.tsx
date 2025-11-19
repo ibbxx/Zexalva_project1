@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
@@ -10,7 +11,7 @@ import ImageUrlUploader, { type ImageUrlItem } from '@/components/admin/ImageUrl
 import { getCategories } from '@/services/categories';
 import AddCategoryModal from '@/components/admin/AddCategoryModal';
 import ManageCategoriesModal from '@/components/admin/ManageCategoriesModal';
-import { updateProduct } from '@/services/products';
+import { getProductVariants, updateProduct, type ProductVariantInput } from '@/services/products';
 import { slugify } from '@/lib/slugify';
 import { ensureUniqueSlug, generateSlug, isSlugUsed } from '@/lib/slugUtils';
 
@@ -26,6 +27,8 @@ interface VariantFormValue {
   stock: string;
 }
 
+type VariantField = keyof Omit<VariantFormValue, 'id'>;
+
 const createEmptyVariant = (): VariantFormValue => ({
   id: `variant-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   size: '',
@@ -37,6 +40,7 @@ export default function ProductsEdit() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast, show } = useToast();
+
   const [form, setForm] = useState({
     name: '',
     slug: '',
@@ -46,170 +50,163 @@ export default function ProductsEdit() {
     is_active: true,
     is_published: true,
   });
+
   const [isSlugSynced, setIsSlugSynced] = useState(true);
   const [slugError, setSlugError] = useState('');
   const [originalSlug, setOriginalSlug] = useState('');
+
   const [images, setImages] = useState<ImageUrlItem[]>([]);
   const [variants, setVariants] = useState<VariantFormValue[]>([createEmptyVariant()]);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState<CategoryRecord[]>([]);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showManageCategories, setShowManageCategories] = useState(false);
 
+  /* load categories */
   useEffect(() => {
-    let isMounted = true;
+    let active = true;
     getCategories().then(({ data, error }) => {
-      if (!isMounted) {
-        return;
-      }
+      if (!active) return;
       if (error) {
-        console.error('Failed to load categories:', error);
+        console.error('failed to load categories:', error);
         show('gagal memuat kategori');
-        return;
+      } else {
+        setCategories(data ?? []);
       }
-      setCategories(data ?? []);
     });
     return () => {
-      isMounted = false;
+      active = false;
     };
-  }, [show]);
+  }, []);
 
+  /* safe load product + images separately (fix failed to fetch) */
   useEffect(() => {
     const loadProduct = async () => {
-      if (!id) {
-        return;
-      }
+      if (!id) return;
       setLoading(true);
+
       try {
+        /* --- LOAD PRODUCT (safe) --- */
         const { data, error } = await supabase
           .from('products')
-          .select(
-            `
-            id,
-            name,
-            slug,
-            description,
-            price,
-            is_active,
-            is_published,
-            category_id,
-            product_images (id, url, position),
-            product_variants (id, size, color, stock)
-          `
-          )
+          .select('*')
           .eq('id', id)
           .single();
-        if (error) {
-          throw error;
+
+        if (error) throw error;
+
+        /* fill form */
+        setForm({
+          name: data.name ?? '',
+          slug: data.slug ?? '',
+          description: data.description ?? '',
+          price: data.price ?? 0,
+          is_active: Boolean(data.is_active),
+          is_published: Boolean(data.is_published),
+          category_id: data.category_id ? String(data.category_id) : '',
+        });
+
+        setOriginalSlug(data.slug ?? '');
+
+        /* --- LOAD IMAGES SEPARATELY (fix nested error) --- */
+        const { data: imageRecords } = await supabase
+          .from('product_images')
+          .select('*')
+          .eq('product_id', data.id)
+          .order('position', { ascending: true });
+
+        const sortedImages = (imageRecords ?? []).map((img) => ({
+          url: img.url ?? '',
+        }));
+
+        setImages(sortedImages);
+
+        /* --- LOAD VARIANTS --- */
+        const { data: variantRecords, error: variantError } = await getProductVariants(String(data.id));
+
+        if (variantError) {
+          console.error('failed to load product variants:', variantError);
+          show('gagal memuat varian produk');
         }
-        if (data) {
-          setForm({
-            name: data.name ?? '',
-            slug: data.slug ?? '',
-            description: data.description ?? '',
-            price: data.price ?? 0,
-            is_active: Boolean(data.is_active),
-            is_published: Boolean(data.is_published),
-            category_id: data.category_id ? String(data.category_id) : '',
-          });
-          setOriginalSlug(data.slug ?? '');
-          const sortedImages = (data.product_images ?? [])
-            .slice()
-            .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-            .map((img) => ({ url: img.url ?? '' }));
-          setImages(sortedImages);
-          const nextVariants = (data.product_variants ?? []).map((variant) => ({
-            id: variant.id ? String(variant.id) : createEmptyVariant().id,
-            size: variant.size ?? '',
-            color: variant.color ?? '',
-            stock: variant.stock !== undefined && variant.stock !== null ? String(variant.stock) : '',
-          }));
-          setVariants(nextVariants.length ? nextVariants : [createEmptyVariant()]);
-        }
-      } catch (error) {
-        console.error('Failed to load product:', error);
+
+        const nextVariants = (variantRecords ?? []).map((variant) => ({
+          id: variant.id ? String(variant.id) : createEmptyVariant().id,
+          size: variant.size ?? '',
+          color: variant.color ?? '',
+          stock: String(variant.stock ?? ''),
+        }));
+
+        setVariants(nextVariants.length ? nextVariants : [createEmptyVariant()]);
+      } catch (err) {
+        console.error('failed to load product:', err);
         show('gagal memuat detail produk');
       } finally {
         setLoading(false);
       }
     };
-    loadProduct().catch(() => setLoading(false));
-  }, [id, show]);
 
+    loadProduct();
+  }, [id]);
+
+  /* auto slug */
   useEffect(() => {
-    if (!isSlugSynced) {
-      return;
-    }
+    if (!isSlugSynced) return;
     setForm((prev) => {
       const generated = generateSlug(prev.name);
-      if (prev.slug === generated) {
-        return prev;
-      }
-      return {
-        ...prev,
-        slug: generated,
-      };
+      if (prev.slug === generated) return prev;
+      return { ...prev, slug: generated };
     });
   }, [form.name, isSlugSynced]);
 
-  type ValidateSlugOptions = {
-    promptOnDuplicate?: boolean;
-    resyncOnEmpty?: boolean;
-  };
-
+  /* slug validation */
   const validateSlug = useCallback(
-    async (value: string, options: ValidateSlugOptions = {}): Promise<string | null> => {
-      const { promptOnDuplicate = false, resyncOnEmpty = false } = options;
+    async (value: string, opts: { promptOnDuplicate?: boolean; resyncOnEmpty?: boolean } = {}) => {
+      const { promptOnDuplicate = false, resyncOnEmpty = false } = opts;
+
       const trimmed = value.trim();
       const normalizedOriginal = originalSlug.trim();
+
       if (!trimmed) {
         const base = generateSlug(form.name);
         if (!base) {
-          if (resyncOnEmpty) {
-            setIsSlugSynced(true);
-          }
+          if (resyncOnEmpty) setIsSlugSynced(true);
           setSlugError('');
           return '';
         }
         try {
           const unique = await ensureUniqueSlug(base);
-          setForm((prev) => ({
-            ...prev,
-            slug: unique,
-          }));
-          if (resyncOnEmpty) {
-            setIsSlugSynced(true);
-          }
+          setForm((p) => ({ ...p, slug: unique }));
+          if (resyncOnEmpty) setIsSlugSynced(true);
           setSlugError('');
           return unique;
-        } catch (error) {
-          console.error('Failed to ensure unique slug:', error);
+        } catch (e) {
+          console.error(e);
           show('gagal memvalidasi slug');
           return null;
         }
       }
+
       if (normalizedOriginal && trimmed === normalizedOriginal) {
         setSlugError('');
         return trimmed;
       }
+
       try {
         const used = await isSlugUsed(trimmed);
         if (used) {
           setSlugError('slug telah dipakai');
           if (promptOnDuplicate) {
-            const shouldAuto = window.confirm('slug telah dipakai. ingin generate otomatis slug unik?');
+            const shouldAuto = window.confirm('slug telah dipakai. ingin generate slug unik otomatis?');
             if (shouldAuto) {
               try {
                 const unique = await ensureUniqueSlug(trimmed);
-                setForm((prev) => ({
-                  ...prev,
-                  slug: unique,
-                }));
+                setForm((p) => ({ ...p, slug: unique }));
                 setSlugError('');
                 return unique;
-              } catch (error) {
-                console.error('Failed to ensure unique slug:', error);
+              } catch (e) {
+                console.error(e);
                 show('gagal memvalidasi slug');
                 return null;
               }
@@ -219,65 +216,78 @@ export default function ProductsEdit() {
         }
         setSlugError('');
         return trimmed;
-      } catch (error) {
-        console.error('Failed to validate slug:', error);
+      } catch (e) {
+        console.error(e);
         show('gagal memvalidasi slug');
         return null;
       }
     },
-    [form.name, originalSlug, show]
+    [form.name, originalSlug]
   );
 
-  const handleInputChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = event.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: name === 'price' ? Number(value) : value,
-    }));
+  /* variant sanitizer (size/color/stock opsional) */
+  const buildVariantPayload = useCallback((): ProductVariantInput[] => {
+    const sanitized: ProductVariantInput[] = [];
+
+    variants.forEach((v) => {
+      const size = v.size.trim();
+      const color = v.color.trim();
+      const stockStr = v.stock.trim();
+
+      const hasStockInput = stockStr !== '';
+      const parsed = hasStockInput ? Number.parseInt(stockStr, 10) : 0;
+      const stockValue = Number.isNaN(parsed) ? 0 : Math.max(0, parsed);
+
+      /* skip empty row */
+      if (!size && !color && !hasStockInput) return;
+
+      sanitized.push({
+        size,
+        color,
+        stock: stockValue,
+        hasStockInput,
+      });
+    });
+
+    return sanitized;
+  }, [variants]);
+
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setForm((p) => ({ ...p, [name]: name === 'price' ? Number(value) : value }));
   };
 
-  const handleToggleChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const { name, checked } = event.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: checked,
-    }));
+  const handleToggleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setForm((p) => ({ ...p, [name]: checked }));
   };
 
-  const handleCategoryChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    const { value } = event.target;
-    setForm((prev) => ({
-      ...prev,
-      category_id: value,
-    }));
+  const handleCategoryChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const { value } = e.target;
+    setForm((p) => ({ ...p, category_id: value }));
   };
 
-  const handleSlugChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleSlugChange = (e: ChangeEvent<HTMLInputElement>) => {
     setIsSlugSynced(false);
-    const sanitized = slugify(event.target.value);
+    const sanitized = slugify(e.target.value);
     setSlugError('');
-    setForm((prev) => ({
-      ...prev,
-      slug: sanitized,
-    }));
+    setForm((p) => ({ ...p, slug: sanitized }));
   };
 
   const handleSlugBlur = () => {
     void validateSlug(form.slug, { promptOnDuplicate: true, resyncOnEmpty: true });
   };
 
-  const handleVariantChange = (variantId: string, field: keyof Omit<VariantFormValue, 'id'>, value: string) => {
+  const handleVariantChange = (variantId: string, field: VariantField, value: string) => {
     setVariants((prev) =>
       prev.map((variant) => (variant.id === variantId ? { ...variant, [field]: value } : variant))
     );
   };
 
-  const addVariant = () => {
-    setVariants((prev) => [...prev, createEmptyVariant()]);
-  };
+  const addVariant = () => setVariants((prev) => [...prev, createEmptyVariant()]);
 
   const removeVariant = (variantId: string) => {
-    setVariants((prev) => prev.filter((variant) => variant.id !== variantId));
+    setVariants((prev) => prev.filter((v) => v.id !== variantId));
   };
 
   const imageUrls = useMemo(
@@ -285,33 +295,23 @@ export default function ProductsEdit() {
     [images]
   );
 
-  const variantPayload = useMemo(
-    () =>
-      variants
-        .map((variant) => ({
-          size: variant.size.trim() || null,
-          color: variant.color.trim() || null,
-          stock: variant.stock !== '' ? Number(variant.stock) : null,
-          price: null,
-        }))
-        .filter((variant) => variant.size),
-    [variants]
-  );
+  /* submit */
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!id) return;
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!id) {
-      return;
-    }
     if (!form.category_id) {
       show('pilih kategori terlebih dahulu');
       return;
     }
+
     const finalSlug = await validateSlug(form.slug, { promptOnDuplicate: true, resyncOnEmpty: true });
-    if (!finalSlug) {
-      return;
-    }
+    if (!finalSlug) return;
+
+    const variantPayload = buildVariantPayload();
+
     setSaving(true);
+
     try {
       const { error } = await updateProduct(
         id,
@@ -327,19 +327,20 @@ export default function ProductsEdit() {
         imageUrls,
         variantPayload
       );
-      if (error) {
-        throw error;
-      }
+
+      if (error) throw error;
+
       show('produk diperbarui');
       navigate('/admin/products');
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(err);
       show('gagal memperbarui produk');
     } finally {
       setSaving(false);
     }
   };
 
+  /* render ui */
   return (
     <div className="space-y-8">
       <Breadcrumb />
@@ -347,16 +348,20 @@ export default function ProductsEdit() {
         <div className="mb-2 text-2xl font-bold capitalize">edit product</div>
         <p className="text-sm text-gray-500">perbarui detail produk.</p>
       </div>
+
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* product info card */}
         <AdminCard title="product information">
           {loading ? (
             <div className="space-y-4">
-              {[...Array(5)].map((_, index) => (
-                <Skeleton key={index} className="h-10 w-full" />
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
               ))}
             </div>
           ) : (
             <div className="space-y-4">
+
+              {/* category */}
               <div>
                 <label className="text-sm font-medium">kategori</label>
                 <div className="mt-1 flex items-center gap-2">
@@ -367,9 +372,9 @@ export default function ProductsEdit() {
                     required
                   >
                     <option value="">pilih kategori</option>
-                    {categories.map((category) => (
-                      <option key={category.id} value={String(category.id)}>
-                        {category.name}
+                    {categories.map((c) => (
+                      <option key={c.id} value={String(c.id)}>
+                        {c.name}
                       </option>
                     ))}
                   </select>
@@ -381,6 +386,7 @@ export default function ProductsEdit() {
                     + buat
                   </button>
                 </div>
+
                 <button
                   type="button"
                   onClick={() => setShowManageCategories(true)}
@@ -389,6 +395,8 @@ export default function ProductsEdit() {
                   kelola kategori
                 </button>
               </div>
+
+              {/* name / slug */}
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium">name</label>
@@ -400,6 +408,7 @@ export default function ProductsEdit() {
                     required
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium">slug</label>
                   <input
@@ -413,31 +422,36 @@ export default function ProductsEdit() {
                   {slugError && <p className="mt-1 text-sm text-red-600">{slugError}</p>}
                 </div>
               </div>
+
+              {/* description */}
               <div>
                 <label className="block text-sm font-medium">description</label>
                 <textarea
                   name="description"
                   value={form.description}
                   onChange={handleInputChange}
-                  className="mt-1 w-full rounded-lg border border-gray-200 p-2"
                   rows={5}
+                  className="mt-1 w-full rounded-lg border border-gray-200 p-2"
                   required
                 />
               </div>
+
+              {/* price + toggles */}
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium">price</label>
                   <input
                     type="number"
+                    min={0}
+                    step={1000}
                     name="price"
                     value={form.price}
                     onChange={handleInputChange}
                     className="mt-1 w-full rounded-lg border border-gray-200 p-2"
-                    min={0}
-                    step={1000}
                     required
                   />
                 </div>
+
                 <div className="flex items-center gap-6 pt-6">
                   <label className="inline-flex items-center gap-2 text-sm font-medium">
                     <input
@@ -448,6 +462,7 @@ export default function ProductsEdit() {
                     />
                     aktif
                   </label>
+
                   <label className="inline-flex items-center gap-2 text-sm font-medium">
                     <input
                       type="checkbox"
@@ -463,63 +478,79 @@ export default function ProductsEdit() {
           )}
         </AdminCard>
 
+        {/* images card */}
         <AdminCard title="media">
           {loading ? <Skeleton className="h-10 w-full" /> : <ImageUrlUploader value={images} onChange={setImages} />}
         </AdminCard>
 
+        {/* variants */}
         <AdminCard title="variants">
           {loading ? (
             <Skeleton className="h-28 w-full" />
           ) : (
             <div className="space-y-4">
-              {variants.length === 0 && (
-                <p className="text-sm text-gray-500">Belum ada varian. Tambahkan minimal satu ukuran.</p>
-              )}
-              {variants.map((variant, index) => (
-                <div key={variant.id} className="rounded-lg border border-gray-200 p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold uppercase tracking-[0.3em] text-gray-500">
-                      Variant {index + 1}
-                    </p>
-                    <button
-                      type="button"
-                      className="text-sm text-red-600"
-                      onClick={() => removeVariant(variant.id)}
-                    >
-                      hapus
-                    </button>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div>
-                      <label className="block text-sm font-medium">size *</label>
-                      <input
-                        value={variant.size}
-                        onChange={(event) => handleVariantChange(variant.id, 'size', event.target.value)}
-                        className="mt-1 w-full rounded-lg border border-gray-200 p-2"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium">color</label>
-                      <input
-                        value={variant.color}
-                        onChange={(event) => handleVariantChange(variant.id, 'color', event.target.value)}
-                        className="mt-1 w-full rounded-lg border border-gray-200 p-2"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium">stock</label>
-                      <input
-                        type="number"
-                        value={variant.stock}
-                        onChange={(event) => handleVariantChange(variant.id, 'stock', event.target.value)}
-                        className="mt-1 w-full rounded-lg border border-gray-200 p-2"
-                        min={0}
-                      />
-                    </div>
-                  </div>
+              {variants.length === 0 ? (
+                <p className="text-sm text-gray-500">belum ada varian. tambahkan varian bila diperlukan.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50 text-xs uppercase tracking-[0.3em] text-gray-500">
+                      <tr>
+                        <th className="px-4 py-3 text-left">size</th>
+                        <th className="px-4 py-3 text-left">color</th>
+                        <th className="px-4 py-3 text-left">stock</th>
+                        <th className="px-4 py-3 text-right">aksi</th>
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {variants.map((v) => (
+                        <tr key={v.id}>
+                          <td className="px-4 py-3">
+                            <input
+                              value={v.size}
+                              onChange={(e) => handleVariantChange(v.id, 'size', e.target.value)}
+                              className="w-full rounded-lg border border-gray-200 p-2"
+                              placeholder="contoh: xl"
+                            />
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <input
+                              value={v.color}
+                              onChange={(e) => handleVariantChange(v.id, 'color', e.target.value)}
+                              className="w-full rounded-lg border border-gray-200 p-2"
+                              placeholder="contoh: black"
+                            />
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <input
+                              type="number"
+                              min={0}
+                              value={v.stock}
+                              onChange={(e) => handleVariantChange(v.id, 'stock', e.target.value)}
+                              className="w-full rounded-lg border border-gray-200 p-2"
+                              placeholder="0"
+                            />
+                          </td>
+
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => removeVariant(v.id)}
+                              className="text-sm text-red-600"
+                            >
+                              hapus
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
+              )}
+
               <button
                 type="button"
                 onClick={addVariant}
@@ -535,26 +566,29 @@ export default function ProductsEdit() {
           {saving ? 'saving...' : 'save changes'}
         </Button>
       </form>
+
       <Toast message={toast} />
+
+      {/* modals */}
       {showAddCategory && (
         <AddCategoryModal
           onClose={() => setShowAddCategory(false)}
-          onCreated={(category) => {
-            setCategories((prev) => [...prev, category]);
-            setForm((prev) => ({
-              ...prev,
-              category_id: String(category.id),
-            }));
+          onCreated={(cat) => {
+            setCategories((prev) => [...prev, cat]);
+            setForm((prev) => ({ ...prev, category_id: String(cat.id) }));
           }}
         />
       )}
+
       {showManageCategories && (
         <ManageCategoriesModal
           categories={categories}
           onClose={() => setShowManageCategories(false)}
           onDeleted={(deletedId) => {
-            setCategories((prev) => prev.filter((cat) => String(cat.id) !== String(deletedId)));
-            setForm((prev) => (String(prev.category_id) === String(deletedId) ? { ...prev, category_id: '' } : prev));
+            setCategories((prev) => prev.filter((c) => String(c.id) !== String(deletedId)));
+            setForm((prev) =>
+              String(prev.category_id) === String(deletedId) ? { ...prev, category_id: '' } : prev
+            );
           }}
         />
       )}

@@ -8,7 +8,7 @@ import ImageUrlUploader, { type ImageUrlItem } from '@/components/admin/ImageUrl
 import { getCategories } from '@/services/categories';
 import AddCategoryModal from '@/components/admin/AddCategoryModal';
 import ManageCategoriesModal from '@/components/admin/ManageCategoriesModal';
-import { createProduct } from '@/services/products';
+import { createProduct, type ProductVariantInput } from '@/services/products';
 import { slugify } from '@/lib/slugify';
 import { ensureUniqueSlug, generateSlug, isSlugUsed } from '@/lib/slugUtils';
 
@@ -23,6 +23,8 @@ interface VariantFormValue {
   color: string;
   stock: string;
 }
+
+type VariantField = keyof Omit<VariantFormValue, 'id'>;
 
 const createEmptyVariant = (): VariantFormValue => ({
   id: `variant-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -156,6 +158,28 @@ export default function ProductsCreate() {
     [form.name, show]
   );
 
+  const buildVariantPayload = useCallback((): ProductVariantInput[] => {
+    const sanitized: ProductVariantInput[] = [];
+    variants.forEach((variant) => {
+      const size = variant.size.trim();
+      const color = variant.color.trim();
+      const stockInput = variant.stock.trim();
+      const hasStockInput = stockInput !== '';
+      const parsedStock = hasStockInput ? Number.parseInt(stockInput, 10) : 0;
+      const stockValue = Number.isNaN(parsedStock) ? 0 : Math.max(0, parsedStock);
+      if (!size && !color && !hasStockInput) {
+        return;
+      }
+      sanitized.push({
+        size,
+        color,
+        stock: stockValue,
+        hasStockInput,
+      });
+    });
+    return sanitized;
+  }, [variants]);
+
   const handleInputChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = event.target;
     setForm((prev) => ({
@@ -194,7 +218,7 @@ export default function ProductsCreate() {
     void validateSlug(form.slug, { promptOnDuplicate: true, resyncOnEmpty: true });
   };
 
-  const handleVariantChange = (id: string, field: keyof Omit<VariantFormValue, 'id'>, value: string) => {
+  const handleVariantChange = (id: string, field: VariantField, value: string) => {
     setVariants((prev) =>
       prev.map((variant) => (variant.id === id ? { ...variant, [field]: value } : variant))
     );
@@ -213,19 +237,6 @@ export default function ProductsCreate() {
     [images]
   );
 
-  const variantPayload = useMemo(
-    () =>
-      variants
-        .map((variant) => ({
-          size: variant.size.trim() || null,
-          color: variant.color.trim() || null,
-          stock: variant.stock !== '' ? Number(variant.stock) : null,
-          price: null,
-        }))
-        .filter((variant) => variant.size),
-    [variants]
-  );
-
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!form.category_id) {
@@ -236,6 +247,7 @@ export default function ProductsCreate() {
     if (!finalSlug) {
       return;
     }
+    const variantPayload = buildVariantPayload();
     setSaving(true);
     try {
       const { error } = await createProduct(
@@ -385,54 +397,63 @@ export default function ProductsCreate() {
 
         <AdminCard title="variants">
           <div className="space-y-4">
-            {variants.length === 0 && (
-              <p className="text-sm text-gray-500">Belum ada varian. Tambahkan minimal satu ukuran.</p>
-            )}
-            {variants.map((variant, index) => (
-              <div key={variant.id} className="rounded-lg border border-gray-200 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold uppercase tracking-[0.3em] text-gray-500">
-                    Variant {index + 1}
-                  </p>
-                  <button
-                    type="button"
-                    className="text-sm text-red-600"
-                    onClick={() => removeVariant(variant.id)}
-                  >
-                    hapus
-                  </button>
-                </div>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div>
-                    <label className="block text-sm font-medium">size *</label>
-                    <input
-                      value={variant.size}
-                      onChange={(event) => handleVariantChange(variant.id, 'size', event.target.value)}
-                      className="mt-1 w-full rounded-lg border border-gray-200 p-2"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium">color</label>
-                    <input
-                      value={variant.color}
-                      onChange={(event) => handleVariantChange(variant.id, 'color', event.target.value)}
-                      className="mt-1 w-full rounded-lg border border-gray-200 p-2"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium">stock</label>
-                    <input
-                      type="number"
-                      value={variant.stock}
-                      onChange={(event) => handleVariantChange(variant.id, 'stock', event.target.value)}
-                      className="mt-1 w-full rounded-lg border border-gray-200 p-2"
-                      min={0}
-                    />
-                  </div>
-                </div>
+            {variants.length === 0 ? (
+              <p className="text-sm text-gray-500">Belum ada varian. Tambahkan detail varian bila diperlukan.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase tracking-[0.3em] text-gray-500">
+                    <tr>
+                      <th className="px-4 py-3 text-left">size</th>
+                      <th className="px-4 py-3 text-left">color</th>
+                      <th className="px-4 py-3 text-left">stock</th>
+                      <th className="px-4 py-3 text-right">aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {variants.map((variant) => (
+                      <tr key={variant.id} className="align-top">
+                        <td className="px-4 py-3">
+                          <input
+                            value={variant.size}
+                            onChange={(event) => handleVariantChange(variant.id, 'size', event.target.value)}
+                            className="w-full rounded-lg border border-gray-200 p-2"
+                            placeholder="contoh: XL"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            value={variant.color}
+                            onChange={(event) => handleVariantChange(variant.id, 'color', event.target.value)}
+                            className="w-full rounded-lg border border-gray-200 p-2"
+                            placeholder="contoh: Black"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="number"
+                            min={0}
+                            value={variant.stock}
+                            onChange={(event) => handleVariantChange(variant.id, 'stock', event.target.value)}
+                            className="w-full rounded-lg border border-gray-200 p-2"
+                            placeholder="0"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            className="text-sm text-red-600"
+                            onClick={() => removeVariant(variant.id)}
+                          >
+                            hapus
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ))}
+            )}
             <button
               type="button"
               onClick={addVariant}
